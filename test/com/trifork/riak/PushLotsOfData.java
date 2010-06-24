@@ -1,3 +1,7 @@
+/**
+ * Sample file using the RiakClient#store(RiakObject, ...) API
+ */
+
 package com.trifork.riak;
 
 import java.io.IOException;

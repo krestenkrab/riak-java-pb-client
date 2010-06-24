@@ -1,3 +1,6 @@
+/**
+ * Sample file listing all contents of a riak store
+ */
 package com.trifork.riak;
 
 import java.io.IOException;
