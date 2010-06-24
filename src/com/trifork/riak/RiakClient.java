@@ -61,7 +61,10 @@ public class RiakClient implements RiakMessageCodes {
 	private InetAddress addr;
 	private int port;
 
-	/** if this has been set (or gotten) then it will be applied to new connections */
+	/**
+	 * if this has been set (or gotten) then it will be applied to new
+	 * connections
+	 */
 	private ByteString clientID;
 
 	public RiakClient(String host) throws IOException {
@@ -83,7 +86,7 @@ public class RiakClient implements RiakMessageCodes {
 		RiakConnection c = connections.get();
 		if (c == null || !c.endIdleAndCheckValid()) {
 			c = new RiakConnection(addr, port);
-			
+
 			if (this.clientID != null) {
 				setClientID(clientID);
 			}
@@ -95,8 +98,13 @@ public class RiakClient implements RiakMessageCodes {
 	}
 
 	void release(RiakConnection c) {
-		c.beginIdle();
-		connections.set(c);
+		RiakConnection cc = connections.get();
+		if (cc == null) {
+			c.beginIdle();
+			connections.set(c);
+		} else {
+			c.close();
+		}
 	}
 
 	/**
@@ -155,7 +163,7 @@ public class RiakClient implements RiakMessageCodes {
 		} finally {
 			release(c);
 		}
-		
+
 		this.clientID = id;
 	}
 
@@ -337,7 +345,9 @@ public class RiakClient implements RiakMessageCodes {
 					byte[] data = c.receive(MSG_PutResp);
 					if (data != null) {
 						RpbPutResp resp = RPB.RpbPutResp.parseFrom(data);
-						vclocks[i] = resp.getVclock();
+						if (resp.hasVclock()) {
+							vclocks[i] = resp.getVclock();
+						}
 					}
 				}
 			} catch (IOException e) {
@@ -494,72 +504,39 @@ public class RiakClient implements RiakMessageCodes {
 
 	// /////////////////////
 
-	public ByteString[] listKeys(ByteString bucket) throws IOException {
+	public KeySource listKeys(ByteString bucket) throws IOException {
 
 		List<ByteString> keys = new ArrayList<ByteString>();
 
 		RiakConnection c = getConnection();
-		try {
-			c.send(MSG_ListKeysReq, RPB.RpbListKeysReq.newBuilder().setBucket(
-					bucket).build());
+		c.send(MSG_ListKeysReq, RPB.RpbListKeysReq.newBuilder().setBucket(
+				bucket).build());
 
-			RpbListKeysResp r;
-			do {
-				byte[] data = c.receive(MSG_ListKeysResp);
-				if (data == null) {
-					return NO_BYTE_STRINGS;
-				}
-				r = RPB.RpbListKeysResp.parseFrom(data);
-
-				for (int i = 0; i < r.getKeysCount(); i++) {
-					keys.add(r.getKeys(i));
-				}
-
-			} while (!r.hasDone() || r.getDone() == false);
-		} finally {
-			release(c);
-		}
-
-		return keys.toArray(new ByteString[keys.size()]);
+		return new KeySource(this, c);
 	}
 
 	// /////////////////////
 
-	MapReduceResponse[] mapreduce(JSONObject obj) throws IOException {
+	MapReduceResponseSource mapreduce(JSONObject obj) throws IOException {
 		return mapreduce(ByteString.copyFromUtf8(obj.toString()),
 				new RequestMeta().contentType("application/json"));
 	}
 
-	public MapReduceResponse[] mapreduce(ByteString request, RequestMeta meta)
-			throws IOException {
+	public MapReduceResponseSource mapreduce(ByteString request,
+			RequestMeta meta) throws IOException {
 		List<MapReduceResponse> out = new ArrayList<MapReduceResponse>();
 		RiakConnection c = getConnection();
-		try {
-			ByteString contentType = meta.getContentType();
-			if (contentType == null) {
-				throw new IllegalArgumentException("no content type");
-			}
-			RpbMapRedReq req = RPB.RpbMapRedReq.newBuilder()
-					.setRequest(request).setContentType(meta.getContentType())
-					.build();
 
-			c.send(MSG_MapRedReq, req);
-			byte[] data = c.receive(MSG_MapRedResp);
-			if (data == null) {
-				return NO_MAP_REDUCE_RESPONSES;
-			}
-
-			RpbMapRedResp resp;
-			do {
-				resp = RPB.RpbMapRedResp.parseFrom(data);
-				out.add(new MapReduceResponse(resp, contentType));
-
-			} while (!resp.hasDone() || resp.getDone() == false);
-		} finally {
-			release(c);
+		ByteString contentType = meta.getContentType();
+		if (contentType == null) {
+			throw new IllegalArgumentException("no content type");
 		}
+		RpbMapRedReq req = RPB.RpbMapRedReq.newBuilder().setRequest(request)
+				.setContentType(meta.getContentType()).build();
 
-		return out.toArray(new MapReduceResponse[out.size()]);
+		c.send(MSG_MapRedReq, req);
+		
+		return new MapReduceResponseSource(this, c, contentType);
 	}
 
 }

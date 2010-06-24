@@ -27,6 +27,7 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import com.google.protobuf.ByteString;
+import com.trifork.riak.MapReduceResponseSource;
 import com.trifork.riak.RequestMeta;
 import com.trifork.riak.RiakClient;
 import com.trifork.riak.RiakObject;
@@ -313,13 +314,13 @@ public class MapReduceBuilder {
      * @throws RiakResponseRuntimeException
      *             If the Riak server returns a malformed response.
      */
-    public MapReduceResponse[] submit(RequestMeta meta) throws IOException {
+    public MapReduceResponseSource submit(RequestMeta meta) throws IOException {
         if (riak == null)
             throw new IllegalStateException("Cannot perform map reduce without a RiakClient");
         return riak.mapreduce(ByteString.copyFromUtf8( toJSON().toString() ), meta);
     }
 
-    public MapReduceResponse[] submit() throws JSONException, IOException {
+    public MapReduceResponseSource submit() throws JSONException, IOException {
         return submit(null);
     }
 

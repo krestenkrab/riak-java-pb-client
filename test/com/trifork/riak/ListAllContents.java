@@ -22,9 +22,9 @@ public class ListAllContents {
 			
 			System.out.println("=bucket "+bucket.toStringUtf8());
 			
-			ByteString[] keys = client.listKeys(bucket);
+			KeySource keys = client.listKeys(bucket);
 			for (ByteString key : keys) {
-
+				
 				System.out.println("==key "+key.toStringUtf8());
 
 				RiakObject[] ros = client.fetch(bucket, key);

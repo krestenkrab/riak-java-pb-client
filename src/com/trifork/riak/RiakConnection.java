@@ -31,7 +31,7 @@ import java.util.TimerTask;
 import com.google.protobuf.MessageLite;
 import com.trifork.riak.RPB.RpbErrorResp;
 
-public class RiakConnection {
+class RiakConnection {
 
 	static final int DEFAULT_RIAK_PB_PORT = 8087;
 
@@ -108,7 +108,7 @@ public class RiakConnection {
 		}
 	}
 
-	static Timer idle_timer = new Timer();
+	static Timer timer = new Timer();
 	TimerTask idle_timeout;
 	
 	public void beginIdle() {
@@ -120,7 +120,7 @@ public class RiakConnection {
 			}
 		};
 		
-		idle_timer.schedule(idle_timeout, 1000);
+		timer.schedule(idle_timeout, 1000);
 	}
 
 	synchronized void timer_fired(TimerTask fired_timer) {
@@ -128,6 +128,13 @@ public class RiakConnection {
 			// if it is not our current timer, then ignore
 			return;
 		}
+		
+		close();
+	}
+
+	void close() {
+		if (isClosed())
+			return;
 		
 		try {
 			sock.close();
@@ -145,7 +152,7 @@ public class RiakConnection {
 		if (tt != null) { tt.cancel(); }
 		idle_timeout = null;
 		
-		if (sock == null) {
+		if (isClosed()) {
 			return false;
 		} else {
 			return true;
@@ -154,6 +161,10 @@ public class RiakConnection {
 
 	public DataOutputStream getOutputStream() {
 		return dout;
+	}
+
+	public boolean isClosed() {
+		return sock == null || sock.isClosed();
 	}
 	
 	
