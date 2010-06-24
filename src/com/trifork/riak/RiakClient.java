@@ -35,6 +35,8 @@ import java.util.Map;
 import java.util.prefs.BackingStoreException;
 import java.util.prefs.Preferences;
 
+import org.json.JSONObject;
+
 import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.MessageLite;
@@ -46,9 +48,13 @@ import com.trifork.riak.RPB.RpbGetResp;
 import com.trifork.riak.RPB.RpbGetServerInfoResp;
 import com.trifork.riak.RPB.RpbListBucketsResp;
 import com.trifork.riak.RPB.RpbListKeysResp;
+import com.trifork.riak.RPB.RpbMapRedReq;
+import com.trifork.riak.RPB.RpbMapRedResp;
 import com.trifork.riak.RPB.RpbPutReq;
 import com.trifork.riak.RPB.RpbPutResp;
 import com.trifork.riak.RPB.RpbSetClientIdReq;
+import com.trifork.riak.RPB.RpbMapRedReq.Builder;
+import com.trifork.riak.mapreduce.MapReduceResponse;
 
 public class RiakClient {
 
@@ -81,6 +87,7 @@ public class RiakClient {
 	private static final int DEFAULT_RIAK_PB_PORT = 8087;
 	private static final RiakObject[] NO_RIAK_OBJECTS = new RiakObject[0];
 	private static final ByteString[] NO_BYTE_STRINGS = new ByteString[0];
+	private static final MapReduceResponse[] NO_MAP_REDUCE_RESPONSES = new MapReduceResponse[0];
 	private Socket sock;
 	private DataOutputStream dout;
 	private DataInputStream din;
@@ -117,7 +124,7 @@ public class RiakClient {
 	 * 
 	 * @throws IOException
 	 */
-	private void prepareClientID() throws IOException {
+	public void prepareClientID() throws IOException {
 		Preferences prefs = Preferences.userNodeForPackage(RiakClient.class);
 
 		String clid = prefs.get("client_id", null);
@@ -402,6 +409,33 @@ public class RiakClient {
 		return out;
 	}
 
+	public BucketProperties getBucketProperties(ByteString bucket) throws IOException {
+		
+		send(MSG_GetBucketReq,
+			 RPB.RpbGetBucketReq.newBuilder()
+				.setBucket(bucket).build());
+		
+		byte[] data = receive(MSG_GetBucketResp);
+		BucketProperties bp = new BucketProperties();
+		if (data == null) {
+			return bp;
+		} 
+
+		bp.init(RPB.RpbGetBucketResp.parseFrom(data));
+		return bp;
+	}
+	
+	public void setBucketProperties(ByteString bucket, BucketProperties props) throws IOException {
+		
+		RPB.RpbSetBucketReq req = RPB.RpbSetBucketReq.newBuilder()
+				.setBucket(bucket)
+				.setProps( props.build() ).build();
+	
+		send(MSG_SetBucketReq, req);
+		receive_code(MSG_SetBucketResp);
+	}
+	
+	
 	// /////////////////////
 
 	public ByteString[] listKeys(ByteString bucket) throws IOException {
@@ -427,8 +461,45 @@ public class RiakClient {
 
 		return keys.toArray(new ByteString[keys.size()]);
 	}
+	
+	
 
-	// /////////////////////
+	///////////////////////
+
+	MapReduceResponse[] mapreduce(JSONObject obj) throws IOException {
+		return mapreduce(ByteString.copyFromUtf8(obj.toString()), 
+				new RequestMeta().contentType("application/json"));
+	}
+
+	public MapReduceResponse[] mapreduce(ByteString request, RequestMeta meta) throws IOException {
+		
+		ByteString contentType = meta.getContentType();
+		if (contentType == null) {
+			throw new IllegalArgumentException("no content type");
+		}
+		RpbMapRedReq req = RPB.RpbMapRedReq.newBuilder()
+			.setRequest(request)
+			.setContentType(meta.getContentType()).build();
+		
+		send(MSG_MapRedReq, req);
+		byte[] data = receive(MSG_MapRedResp);
+		if (data == null) {
+			return NO_MAP_REDUCE_RESPONSES;
+		} 
+
+		List<MapReduceResponse> out = new ArrayList<MapReduceResponse>();
+		RpbMapRedResp resp;
+		do {
+			resp = RPB.RpbMapRedResp.parseFrom(data);
+			out.add(new MapReduceResponse(resp, contentType));
+			
+		} while (!resp.hasDone() || resp.getDone() == false); 
+		
+		return out.toArray(new MapReduceResponse[out.size()]);
+	}
+	
+
+	///////////////////////
 
 	private void send(int code, MessageLite req) throws IOException {
 		int len = req.getSerializedSize();

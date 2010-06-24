@@ -18,11 +18,14 @@
 
 package com.trifork.riak;
 
+import com.google.protobuf.ByteString;
+
 public class RequestMeta {
 
 	Boolean returnBody;
 	Integer writeQuorum;
 	Integer durableWriteQuorum;
+	String contentType;
 	
 	public RequestMeta() {
 	}
@@ -55,5 +58,14 @@ public class RequestMeta {
 	RequestMeta dw(int dw) {
 		dw = new Integer(dw);
 		return this;
+	}
+	
+	RequestMeta contentType(String contentType) {
+		this.contentType = contentType;
+		return this;
+	}
+
+	public ByteString getContentType() {
+		return ByteString.copyFromUtf8(contentType);
 	}
 }
