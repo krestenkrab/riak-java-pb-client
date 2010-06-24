@@ -1,0 +1,134 @@
+package com.trifork.riak;
+
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
+
+import com.google.protobuf.ByteString;
+import com.trifork.riak.RPB.RpbContent;
+import com.trifork.riak.RPB.RpbPair;
+import com.trifork.riak.RPB.RpbContent.Builder;
+
+public class RiakObject {
+
+	private ByteString vclock;
+	private ByteString bucket;
+	private ByteString key;
+	
+	private ByteString value;
+
+	private String contentType;
+	private RiakLink[] links;
+	private String vtag;
+	private String contentEncoding;
+	private String charset;
+	private Map<String,String> userMeta;
+	private Integer lastModified;
+	private Integer lastModifiedUsec;
+	
+
+	RiakObject(ByteString vclock, ByteString bucket, ByteString key, RpbContent content) {
+		this.vclock = vclock;
+		this.bucket = bucket;
+		this.key = key;
+		this.value = content.getValue();
+		this.contentType = str(content.getContentType());
+		this.charset = str(content.getCharset());
+		this.contentEncoding = str(content.getContentEncoding());
+		this.vtag = str(content.getVtag());
+		this.links = content.getLinksCount() == 0 
+			? null 
+			: RiakLink.decode(content.getLinksList());
+		
+		if (content.hasLastMod()) {
+			this.lastModified = new Integer(content.getLastMod());
+			this.lastModifiedUsec = new Integer(content.getLastModUsecs());
+		}
+
+		if (content.getUsermetaCount() == 0) {
+			userMeta = Collections.emptyMap();
+		} else {
+			userMeta = new HashMap<String, String>();
+			for (int i = 0; i < content.getUsermetaCount(); i++) {
+				RpbPair um = content.getUsermeta(i);
+				userMeta.put(um.getKey().toStringUtf8(),
+							 str(um.getValue()));
+			}
+		}
+	}
+
+	public RiakObject(ByteString bucket, ByteString key, ByteString content) {
+		this.bucket = bucket;
+		this.key = key;
+		this.value = content;
+	}
+
+	private String str(ByteString str) {
+		if (str == null) return null;
+		return str.toStringUtf8();
+	}
+
+	public ByteString getBucket() {
+		return bucket;
+	}
+
+	public ByteString getKey() {
+		return key;
+	}
+	
+	public ByteString getVclock() {
+		return vclock;
+	}
+
+
+	public RpbContent buildContent() {
+		Builder b = 
+			RpbContent.newBuilder()
+				.setValue(value);
+		
+		if (contentType != null) {
+			b.setContentType(ByteString.copyFromUtf8(contentType));
+		}
+				
+		if (charset != null) {
+			b.setCharset(ByteString.copyFromUtf8(charset));
+		}
+				
+		if (contentEncoding != null) {
+			b.setContentEncoding(ByteString.copyFromUtf8(contentEncoding));
+		}
+
+		if (vtag != null) {
+			b.setVtag(ByteString.copyFromUtf8(vtag));
+		}
+		
+		if (links != null && links.length != 0) {
+			for (int i = 0; i < links.length; i++) {
+				b.addLinks(links[i].build());
+			}
+		}
+		
+		if (lastModified != null) {
+			b.setLastMod(lastModified);
+		}
+		
+		if (lastModifiedUsec != null) {
+			b.setLastModUsecs(lastModifiedUsec);
+		}
+		
+		if (userMeta != null && !userMeta.isEmpty()) {
+			int i = 0;
+			for (Map.Entry<String, String> ent : userMeta.entrySet()) {
+				ByteString key = ByteString.copyFromUtf8(ent.getKey());
+				com.trifork.riak.RPB.RpbPair.Builder pb = RPB.RpbPair.newBuilder().setKey(key);
+				if (ent.getValue() != null) {
+					pb.setValue(ByteString.copyFromUtf8(ent.getValue()));
+				}
+				b.addUsermeta(pb);
+			}
+		}
+		
+		return b.build();
+	}
+
+}
