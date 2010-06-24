@@ -42,7 +42,7 @@ public class MapReduceBuilder {
     }
 
     private String bucket = null;
-    private Map<ByteString, Set<ByteString>> objects = new HashMap<ByteString, Set<ByteString>>();
+    private Map<String, Set<String>> objects = new HashMap<String, Set<String>>();
     private List<MapReducePhase> phases = new LinkedList<MapReducePhase>();
     private int timeout = -1;
     private RiakClient riak = null;
@@ -96,12 +96,12 @@ public class MapReduceBuilder {
      * @throws IllegalStateException
      *             - If a bucket name has already been set on the job
      */
-    public void addRiakObject(ByteString bucket, ByteString key) {
+    public void addRiakObject(String bucket, String key) {
         if (this.bucket != null)
             throw new IllegalStateException("Cannot map/reduce over buckets and objects");
-        Set<ByteString> keys = objects.get(bucket);
+        Set<String> keys = objects.get(bucket);
         if (keys == null) {
-            keys = new LinkedHashSet<ByteString>();
+            keys = new LinkedHashSet<String>();
             objects.put(bucket, keys);
         }
         keys.add(key);
@@ -111,7 +111,7 @@ public class MapReduceBuilder {
      * Removes a Riak object (bucket name/key pair) for the job's input list
      */
     public void removeRiakObject(String bucket, String key) {
-        Set<ByteString> keys = objects.get(bucket);
+        Set<String> keys = objects.get(bucket);
         if (keys != null) {
             keys.remove(key);
             if (keys.size() == 0) {
@@ -123,8 +123,8 @@ public class MapReduceBuilder {
     /**
      * Returns a copy of the Riak objects on the input list for a map/reduce job
      */
-    public Map<ByteString, Set<ByteString>> getRiakObjects() {
-        return new HashMap<ByteString, Set<ByteString>>(objects);
+    public Map<String, Set<String>> getRiakObjects() {
+        return new HashMap<String, Set<String>>(objects);
     }
 
     /**
@@ -134,14 +134,14 @@ public class MapReduceBuilder {
      * @throws IllegalStateException
      *             - If a bucket name has already been set on the job
      */
-    public MapReduceBuilder setRiakObjects(Map<ByteString, Set<ByteString>> objects) {
+    public MapReduceBuilder setRiakObjects(Map<String, Set<String>> objects) {
         if (bucket != null)
             throw new IllegalStateException("Cannot map/reduce over buckets and objects");
 
         if (objects == null) {
             clearRiakObjects();
         } else {
-            this.objects = new HashMap<ByteString, Set<ByteString>>(objects);
+            this.objects = new HashMap<String, Set<String>>(objects);
         }
 
         return this;
@@ -371,10 +371,10 @@ public class MapReduceBuilder {
             }
         } else {
             JSONArray inputs = new JSONArray();
-            for (ByteString bucket : objects.keySet()) {
-                Set<ByteString> keys = objects.get(bucket);
-                for (ByteString key : keys) {
-                    ByteString[] pair = { bucket, key };
+            for (String bucket : objects.keySet()) {
+                Set<String> keys = objects.get(bucket);
+                for (String key : keys) {
+                	String[] pair = { bucket, key };
                     inputs.put(pair);
                 }
             }
