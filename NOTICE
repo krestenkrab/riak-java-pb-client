@@ -21,7 +21,7 @@
 This project includes the following 3rd party pieces
 
 
-	Protocol buffers spec for Riak client API
+	Misc. files from Riak and Riak's riak-java-client
 	
 	** riakclient.proto: Protocol buffers for riak
 	**
@@ -42,8 +42,12 @@ This project includes the following 3rd party pieces
 	** under the License.
 
 
-
-
+	Base64 Encoder
+	
+	//Copyright 2003-2010 Christian d'Heureuse, Inventec Informatik AG, Zurich, Switzerland
+	//www.source-code.biz, www.inventec.ch/chdh
+	
+	
 
  	Protocol buffers support library 	
 	protobuf-java-2.3.0.jar

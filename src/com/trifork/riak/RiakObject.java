@@ -81,17 +81,32 @@ public class RiakObject {
 		this.value = content;
 	}
 
+	public RiakObject(String bucket, String key, String content) {
+		this.bucket = ByteString.copyFromUtf8(bucket);
+		this.key = ByteString.copyFromUtf8(key);
+		this.value = ByteString.copyFromUtf8(content);
+	}
+
 	private String str(ByteString str) {
 		if (str == null) return null;
 		return str.toStringUtf8();
 	}
 
-	public ByteString getBucket() {
+	public ByteString getBucketBS() {
 		return bucket;
 	}
 
-	public ByteString getKey() {
+	public String getBucket() {
+		return bucket.toStringUtf8();
+	}
+	
+
+	public ByteString getKeyBS() {
 		return key;
+	}
+	
+	public String getKey() {
+		return key.toStringUtf8();
 	}
 	
 	public ByteString getVclock() {
@@ -99,7 +114,7 @@ public class RiakObject {
 	}
 
 
-	public RpbContent buildContent() {
+	RpbContent buildContent() {
 		Builder b = 
 			RpbContent.newBuilder()
 				.setValue(value);
@@ -135,7 +150,6 @@ public class RiakObject {
 		}
 		
 		if (userMeta != null && !userMeta.isEmpty()) {
-			int i = 0;
 			for (Map.Entry<String, String> ent : userMeta.entrySet()) {
 				ByteString key = ByteString.copyFromUtf8(ent.getKey());
 				com.trifork.riak.RPB.RpbPair.Builder pb = RPB.RpbPair.newBuilder().setKey(key);

@@ -18,13 +18,9 @@
 
 package com.trifork.riak;
 
-import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
-import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.InetAddress;
-import java.net.Socket;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.util.ArrayList;
@@ -39,9 +35,7 @@ import org.json.JSONObject;
 
 import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
-import com.google.protobuf.MessageLite;
 import com.trifork.riak.RPB.RpbDelReq;
-import com.trifork.riak.RPB.RpbErrorResp;
 import com.trifork.riak.RPB.RpbGetClientIdResp;
 import com.trifork.riak.RPB.RpbGetReq;
 import com.trifork.riak.RPB.RpbGetResp;
@@ -53,49 +47,25 @@ import com.trifork.riak.RPB.RpbMapRedResp;
 import com.trifork.riak.RPB.RpbPutReq;
 import com.trifork.riak.RPB.RpbPutResp;
 import com.trifork.riak.RPB.RpbSetClientIdReq;
-import com.trifork.riak.RPB.RpbMapRedReq.Builder;
 import com.trifork.riak.mapreduce.MapReduceResponse;
 
-public class RiakClient {
+public class RiakClient implements RiakMessageCodes {
 
-	public static final int MSG_ErrorResp = 0;
-	public static final int MSG_PingReq = 1;
-	public static final int MSG_PingResp = 2;
-	public static final int MSG_GetClientIdReq = 3;
-	public static final int MSG_GetClientIdResp = 4;
-	public static final int MSG_SetClientIdReq = 5;
-	public static final int MSG_SetClientIdResp = 6;
-	public static final int MSG_GetServerInfoReq = 7;
-	public static final int MSG_GetServerInfoResp = 8;
-	public static final int MSG_GetReq = 9;
-	public static final int MSG_GetResp = 10;
-	public static final int MSG_PutReq = 11;
-	public static final int MSG_PutResp = 12;
-	public static final int MSG_DelReq = 13;
-	public static final int MSG_DelResp = 14;
-	public static final int MSG_ListBucketsReq = 15;
-	public static final int MSG_ListBucketsResp = 16;
-	public static final int MSG_ListKeysReq = 17;
-	public static final int MSG_ListKeysResp = 18;
-	public static final int MSG_GetBucketReq = 19;
-	public static final int MSG_GetBucketResp = 20;
-	public static final int MSG_SetBucketReq = 21;
-	public static final int MSG_SetBucketResp = 22;
-	public static final int MSG_MapRedReq = 23;
-	public static final int MSG_MapRedResp = 24;
-
-	private static final int DEFAULT_RIAK_PB_PORT = 8087;
 	private static final RiakObject[] NO_RIAK_OBJECTS = new RiakObject[0];
 	private static final ByteString[] NO_BYTE_STRINGS = new ByteString[0];
+	private static final String[] NO_STRINGS = new String[0];
 	private static final MapReduceResponse[] NO_MAP_REDUCE_RESPONSES = new MapReduceResponse[0];
-	private Socket sock;
-	private DataOutputStream dout;
-	private DataInputStream din;
+
 	private String node;
 	private String serverVersion;
+	private InetAddress addr;
+	private int port;
+
+	/** if this has been set (or gotten) then it will be applied to new connections */
+	private ByteString clientID;
 
 	public RiakClient(String host) throws IOException {
-		this(host, DEFAULT_RIAK_PB_PORT);
+		this(host, RiakConnection.DEFAULT_RIAK_PB_PORT);
 	}
 
 	public RiakClient(String host, int port) throws IOException {
@@ -103,20 +73,30 @@ public class RiakClient {
 	}
 
 	public RiakClient(InetAddress addr, int port) throws IOException {
-		sock = new Socket(addr, port);
-		
-		sock.setSendBufferSize(1024 * 200);
-		
-		dout = new DataOutputStream(new BufferedOutputStream(sock
-				.getOutputStream(), 1024 * 200));
-		din = new DataInputStream(
-				new BufferedInputStream(sock.getInputStream(), 1024 * 200));
+		this.addr = addr;
+		this.port = port;
+	}
 
-		ping();
+	private ThreadLocal<RiakConnection> connections = new ThreadLocal<RiakConnection>();
 
-		// prepareClientID();
+	RiakConnection getConnection() throws IOException {
+		RiakConnection c = connections.get();
+		if (c == null || !c.endIdleAndCheckValid()) {
+			c = new RiakConnection(addr, port);
+			
+			if (this.clientID != null) {
+				setClientID(clientID);
+			}
+		} else {
+			// we're fine! //
+		}
+		connections.set(null);
+		return c;
+	}
 
-		getServerInfo();
+	void release(RiakConnection c) {
+		c.beginIdle();
+		connections.set(c);
 	}
 
 	/**
@@ -150,8 +130,13 @@ public class RiakClient {
 	}
 
 	public void ping() throws IOException {
-		send(MSG_PingReq);
-		receive_code(MSG_PingResp);
+		RiakConnection c = getConnection();
+		try {
+			c.send(MSG_PingReq);
+			c.receive_code(MSG_PingResp);
+		} finally {
+			release(c);
+		}
 	}
 
 	public void setClientID(String id) throws IOException {
@@ -163,36 +148,54 @@ public class RiakClient {
 	public void setClientID(ByteString id) throws IOException {
 		RpbSetClientIdReq req = RPB.RpbSetClientIdReq.newBuilder().setClientId(
 				id).build();
-		send(MSG_SetClientIdReq, req);
-		receive_code(MSG_SetClientIdResp);
+		RiakConnection c = getConnection();
+		try {
+			c.send(MSG_SetClientIdReq, req);
+			c.receive_code(MSG_SetClientIdResp);
+		} finally {
+			release(c);
+		}
+		
+		this.clientID = id;
 	}
 
 	public String getClientID() throws IOException {
-		send(MSG_GetClientIdReq);
-		byte[] data = receive(MSG_GetClientIdResp);
-		if (data == null)
-			return null;
-		RpbGetClientIdResp res = RPB.RpbGetClientIdResp.parseFrom(data);
-		return res.getClientId().toStringUtf8();
+		RiakConnection c = getConnection();
+		try {
+			c.send(MSG_GetClientIdReq);
+			byte[] data = c.receive(MSG_GetClientIdResp);
+			if (data == null)
+				return null;
+			RpbGetClientIdResp res = RPB.RpbGetClientIdResp.parseFrom(data);
+			clientID = res.getClientId();
+			return clientID.toStringUtf8();
+		} finally {
+			release(c);
+		}
 	}
 
 	public Map<String, String> getServerInfo() throws IOException {
-		send(MSG_GetServerInfoReq);
-		byte[] data = receive(MSG_GetServerInfoResp);
-		if (data == null)
-			return Collections.emptyMap();
-		
-		RpbGetServerInfoResp res = RPB.RpbGetServerInfoResp.parseFrom(data);
-		if (res.hasNode()) {
-			this.node = res.getNode().toStringUtf8();
+		RiakConnection c = getConnection();
+		try {
+			c.send(MSG_GetServerInfoReq);
+			byte[] data = c.receive(MSG_GetServerInfoResp);
+			if (data == null)
+				return Collections.emptyMap();
+
+			RpbGetServerInfoResp res = RPB.RpbGetServerInfoResp.parseFrom(data);
+			if (res.hasNode()) {
+				this.node = res.getNode().toStringUtf8();
+			}
+			if (res.hasServerVersion()) {
+				this.serverVersion = res.getServerVersion().toStringUtf8();
+			}
+			Map<String, String> result = new HashMap<String, String>();
+			result.put("node", node);
+			result.put("server_version", serverVersion);
+			return result;
+		} finally {
+			release(c);
 		}
-		if (res.hasServerVersion()) {
-			this.serverVersion = res.getServerVersion().toStringUtf8();
-		}
-		Map<String, String> result = new HashMap<String, String>();
-		result.put("node", node);
-		result.put("server_version", serverVersion);
-		return result;
 	}
 
 	// /////////////////////
@@ -208,8 +211,13 @@ public class RiakClient {
 		RpbGetReq req = RPB.RpbGetReq.newBuilder().setBucket(bucket)
 				.setKey(key).setR(readQuorum).build();
 
-		send(MSG_GetReq, req);
-		return process_fetch_reply(bucket, key);
+		RiakConnection c = getConnection();
+		try {
+			c.send(MSG_GetReq, req);
+			return process_fetch_reply(c, bucket, key);
+		} finally {
+			release(c);
+		}
 
 	}
 
@@ -223,13 +231,19 @@ public class RiakClient {
 		RpbGetReq req = RPB.RpbGetReq.newBuilder().setBucket(bucket)
 				.setKey(key).build();
 
-		send(MSG_GetReq, req);
-		return process_fetch_reply(bucket, key);
+		RiakConnection c = getConnection();
+		try {
+			c.send(MSG_GetReq, req);
+			return process_fetch_reply(c, bucket, key);
+		} finally {
+			release(c);
+		}
 	}
 
-	private RiakObject[] process_fetch_reply(ByteString bucket, ByteString key)
-			throws IOException, InvalidProtocolBufferException {
-		byte[] rep = receive(MSG_GetResp);
+	private RiakObject[] process_fetch_reply(RiakConnection c,
+			ByteString bucket, ByteString key) throws IOException,
+			InvalidProtocolBufferException {
+		byte[] rep = c.receive(MSG_GetResp);
 
 		if (rep == null) {
 			return NO_RIAK_OBJECTS;
@@ -250,58 +264,68 @@ public class RiakClient {
 	public ByteString[] store(RiakObject[] values, RequestMeta meta)
 			throws IOException {
 
-		BulkReader reader = new BulkReader(values.length);
-		Thread worker = new Thread(reader);
-		worker.start();
-
-		for (int i = 0; i < values.length; i++) {
-			RiakObject value = values[i];
-
-			RPB.RpbPutReq.Builder builder = RPB.RpbPutReq.newBuilder()
-					.setBucket(value.getBucket()).setKey(value.getKey())
-					.setContent(value.buildContent());
-
-			if (value.getVclock() != null) {
-				builder.setVclock(value.getVclock());
-			}
-
-			if (meta != null) {
-
-				builder.setReturnBody(false);
-
-				if (meta.writeQuorum != null) {
-					builder.setW(meta.writeQuorum.intValue());
-				}
-
-				if (meta.durableWriteQuorum != null) {
-					builder.setDw(meta.durableWriteQuorum.intValue());
-				}
-			}
-
-			RpbPutReq req = builder.build();
-
-			int len = req.getSerializedSize();
-			dout.writeInt(len + 1);
-			dout.write(MSG_PutReq);
-			req.writeTo(dout);
-		}
-
-		dout.flush();
-
+		RiakConnection c = getConnection();
 		try {
-			worker.join();
-		} catch (InterruptedException e) {
-			e.printStackTrace();
-		}
+			BulkReader reader = new BulkReader(c, values.length);
+			Thread worker = new Thread(reader);
+			worker.start();
 
-		return reader.vclocks;
+			DataOutputStream dout = c.getOutputStream();
+
+			for (int i = 0; i < values.length; i++) {
+				RiakObject value = values[i];
+
+				RPB.RpbPutReq.Builder builder = RPB.RpbPutReq.newBuilder()
+						.setBucket(value.getBucketBS())
+						.setKey(value.getKeyBS()).setContent(
+								value.buildContent());
+
+				if (value.getVclock() != null) {
+					builder.setVclock(value.getVclock());
+				}
+
+				if (meta != null) {
+
+					builder.setReturnBody(false);
+
+					if (meta.writeQuorum != null) {
+						builder.setW(meta.writeQuorum.intValue());
+					}
+
+					if (meta.durableWriteQuorum != null) {
+						builder.setDw(meta.durableWriteQuorum.intValue());
+					}
+				}
+
+				RpbPutReq req = builder.build();
+
+				int len = req.getSerializedSize();
+				dout.writeInt(len + 1);
+				dout.write(MSG_PutReq);
+				req.writeTo(dout);
+			}
+
+			dout.flush();
+
+			try {
+				worker.join();
+			} catch (InterruptedException e) {
+				e.printStackTrace();
+			}
+
+			return reader.vclocks;
+		} finally {
+			release(c);
+		}
 	}
 
 	class BulkReader implements Runnable {
 
 		private ByteString[] vclocks;
+		private final RiakConnection c;
 
-		public BulkReader(int count) {
+		public BulkReader(RiakConnection c, int count) {
+			this.c = c;
 			this.vclocks = new ByteString[count];
 		}
 
@@ -310,7 +334,7 @@ public class RiakClient {
 
 			try {
 				for (int i = 0; i < vclocks.length; i++) {
-					byte[] data = receive(MSG_PutResp);
+					byte[] data = c.receive(MSG_PutResp);
 					if (data != null) {
 						RpbPutResp resp = RPB.RpbPutResp.parseFrom(data);
 						vclocks[i] = resp.getVclock();
@@ -333,7 +357,7 @@ public class RiakClient {
 			throws IOException {
 
 		RPB.RpbPutReq.Builder builder = RPB.RpbPutReq.newBuilder().setBucket(
-				value.getBucket()).setKey(value.getKey()).setContent(
+				value.getBucketBS()).setKey(value.getKeyBS()).setContent(
 				value.buildContent());
 
 		if (value.getVclock() != null) {
@@ -344,24 +368,29 @@ public class RiakClient {
 			meta.preparePut(builder);
 		}
 
-		send(MSG_PutReq, builder.build());
-		byte[] r = receive(MSG_PutResp);
+		RiakConnection c = getConnection();
+		try {
+			c.send(MSG_PutReq, builder.build());
+			byte[] r = c.receive(MSG_PutResp);
 
-		if (r == null) {
-			return NO_RIAK_OBJECTS;
+			if (r == null) {
+				return NO_RIAK_OBJECTS;
+			}
+
+			RpbPutResp resp = RPB.RpbPutResp.parseFrom(r);
+
+			RiakObject[] res = new RiakObject[resp.getContentsCount()];
+			ByteString vclock = resp.getVclock();
+
+			for (int i = 0; i < res.length; i++) {
+				res[i] = new RiakObject(vclock, value.getBucketBS(), value
+						.getKeyBS(), resp.getContents(i));
+			}
+
+			return res;
+		} finally {
+			release(c);
 		}
-		
-		RpbPutResp resp = RPB.RpbPutResp.parseFrom(r);
-
-		RiakObject[] res = new RiakObject[resp.getContentsCount()];
-		ByteString vclock = resp.getVclock();
-
-		for (int i = 0; i < res.length; i++) {
-			res[i] = new RiakObject(vclock, value.getBucket(), value.getKey(),
-					resp.getContents(i));
-		}
-
-		return res;
 	}
 
 	// /////////////////////
@@ -376,8 +405,14 @@ public class RiakClient {
 		RpbDelReq req = RPB.RpbDelReq.newBuilder().setBucket(bucket)
 				.setKey(key).setRw(rw).build();
 
-		send(MSG_DelReq, req);
-		receive_code(MSG_DelResp);
+		RiakConnection c = getConnection();
+		try {
+			c.send(MSG_DelReq, req);
+			c.receive_code(MSG_DelResp);
+		} finally {
+			release(c);
+		}
+
 	}
 
 	void delete(String bucket, String key) throws IOException {
@@ -388,17 +423,28 @@ public class RiakClient {
 		RpbDelReq req = RPB.RpbDelReq.newBuilder().setBucket(bucket)
 				.setKey(key).build();
 
-		send(MSG_DelReq, req);
-		receive_code(MSG_DelResp);
+		RiakConnection c = getConnection();
+		try {
+			c.send(MSG_DelReq, req);
+			c.receive_code(MSG_DelResp);
+		} finally {
+			release(c);
+		}
 	}
 
 	public ByteString[] listBuckets() throws IOException {
 
-		send(MSG_ListBucketsReq);
+		byte[] data;
+		RiakConnection c = getConnection();
+		try {
+			c.send(MSG_ListBucketsReq);
 
-		byte[] data = receive(MSG_ListBucketsResp);
-		if (data == null) {
-			return NO_BYTE_STRINGS;
+			data = c.receive(MSG_ListBucketsResp);
+			if (data == null) {
+				return NO_BYTE_STRINGS;
+			}
+		} finally {
+			release(c);
 		}
 
 		RpbListBucketsResp resp = RPB.RpbListBucketsResp.parseFrom(data);
@@ -409,143 +455,111 @@ public class RiakClient {
 		return out;
 	}
 
-	public BucketProperties getBucketProperties(ByteString bucket) throws IOException {
-		
-		send(MSG_GetBucketReq,
-			 RPB.RpbGetBucketReq.newBuilder()
-				.setBucket(bucket).build());
-		
-		byte[] data = receive(MSG_GetBucketResp);
-		BucketProperties bp = new BucketProperties();
-		if (data == null) {
-			return bp;
-		} 
+	public BucketProperties getBucketProperties(ByteString bucket)
+			throws IOException {
 
-		bp.init(RPB.RpbGetBucketResp.parseFrom(data));
-		return bp;
+		RiakConnection c = getConnection();
+		try {
+			c.send(MSG_GetBucketReq, RPB.RpbGetBucketReq.newBuilder()
+					.setBucket(bucket).build());
+
+			byte[] data = c.receive(MSG_GetBucketResp);
+			BucketProperties bp = new BucketProperties();
+			if (data == null) {
+				return bp;
+			}
+
+			bp.init(RPB.RpbGetBucketResp.parseFrom(data));
+			return bp;
+		} finally {
+			release(c);
+		}
+
 	}
-	
-	public void setBucketProperties(ByteString bucket, BucketProperties props) throws IOException {
-		
-		RPB.RpbSetBucketReq req = RPB.RpbSetBucketReq.newBuilder()
-				.setBucket(bucket)
-				.setProps( props.build() ).build();
-	
-		send(MSG_SetBucketReq, req);
-		receive_code(MSG_SetBucketResp);
+
+	public void setBucketProperties(ByteString bucket, BucketProperties props)
+			throws IOException {
+
+		RPB.RpbSetBucketReq req = RPB.RpbSetBucketReq.newBuilder().setBucket(
+				bucket).setProps(props.build()).build();
+
+		RiakConnection c = getConnection();
+		try {
+			c.send(MSG_SetBucketReq, req);
+			c.receive_code(MSG_SetBucketResp);
+		} finally {
+			release(c);
+		}
 	}
-	
-	
+
 	// /////////////////////
 
 	public ByteString[] listKeys(ByteString bucket) throws IOException {
 
-		send(MSG_ListKeysReq, RPB.RpbListKeysReq.newBuilder().setBucket(bucket)
-				.build());
-
 		List<ByteString> keys = new ArrayList<ByteString>();
 
-		RpbListKeysResp r;
-		do {
-			byte[] data = receive(MSG_ListKeysResp);
-			if (data == null) {
-				return NO_BYTE_STRINGS;
-			}
-			r = RPB.RpbListKeysResp.parseFrom(data);
+		RiakConnection c = getConnection();
+		try {
+			c.send(MSG_ListKeysReq, RPB.RpbListKeysReq.newBuilder().setBucket(
+					bucket).build());
 
-			for (int i = 0; i < r.getKeysCount(); i++) {
-				keys.add(r.getKeys(i));
-			}
+			RpbListKeysResp r;
+			do {
+				byte[] data = c.receive(MSG_ListKeysResp);
+				if (data == null) {
+					return NO_BYTE_STRINGS;
+				}
+				r = RPB.RpbListKeysResp.parseFrom(data);
 
-		} while (!r.hasDone() || r.getDone() == false);
+				for (int i = 0; i < r.getKeysCount(); i++) {
+					keys.add(r.getKeys(i));
+				}
+
+			} while (!r.hasDone() || r.getDone() == false);
+		} finally {
+			release(c);
+		}
 
 		return keys.toArray(new ByteString[keys.size()]);
 	}
-	
-	
 
-	///////////////////////
+	// /////////////////////
 
 	MapReduceResponse[] mapreduce(JSONObject obj) throws IOException {
-		return mapreduce(ByteString.copyFromUtf8(obj.toString()), 
+		return mapreduce(ByteString.copyFromUtf8(obj.toString()),
 				new RequestMeta().contentType("application/json"));
 	}
 
-	public MapReduceResponse[] mapreduce(ByteString request, RequestMeta meta) throws IOException {
-		
-		ByteString contentType = meta.getContentType();
-		if (contentType == null) {
-			throw new IllegalArgumentException("no content type");
-		}
-		RpbMapRedReq req = RPB.RpbMapRedReq.newBuilder()
-			.setRequest(request)
-			.setContentType(meta.getContentType()).build();
-		
-		send(MSG_MapRedReq, req);
-		byte[] data = receive(MSG_MapRedResp);
-		if (data == null) {
-			return NO_MAP_REDUCE_RESPONSES;
-		} 
-
+	public MapReduceResponse[] mapreduce(ByteString request, RequestMeta meta)
+			throws IOException {
 		List<MapReduceResponse> out = new ArrayList<MapReduceResponse>();
-		RpbMapRedResp resp;
-		do {
-			resp = RPB.RpbMapRedResp.parseFrom(data);
-			out.add(new MapReduceResponse(resp, contentType));
-			
-		} while (!resp.hasDone() || resp.getDone() == false); 
-		
+		RiakConnection c = getConnection();
+		try {
+			ByteString contentType = meta.getContentType();
+			if (contentType == null) {
+				throw new IllegalArgumentException("no content type");
+			}
+			RpbMapRedReq req = RPB.RpbMapRedReq.newBuilder()
+					.setRequest(request).setContentType(meta.getContentType())
+					.build();
+
+			c.send(MSG_MapRedReq, req);
+			byte[] data = c.receive(MSG_MapRedResp);
+			if (data == null) {
+				return NO_MAP_REDUCE_RESPONSES;
+			}
+
+			RpbMapRedResp resp;
+			do {
+				resp = RPB.RpbMapRedResp.parseFrom(data);
+				out.add(new MapReduceResponse(resp, contentType));
+
+			} while (!resp.hasDone() || resp.getDone() == false);
+		} finally {
+			release(c);
+		}
+
 		return out.toArray(new MapReduceResponse[out.size()]);
 	}
-	
 
-	///////////////////////
-
-	private void send(int code, MessageLite req) throws IOException {
-		int len = req.getSerializedSize();
-		dout.writeInt(len + 1);
-		dout.write(code);
-		req.writeTo(dout);
-		dout.flush();
-	}
-
-	private void send(int code) throws IOException {
-		dout.writeInt(1);
-		dout.write(code);
-		dout.flush();
-	}
-
-	private byte[] receive(int code) throws IOException {
-		int len = din.readInt();
-		int get_code = din.read();
-
-		if (code == MSG_ErrorResp) {
-			RpbErrorResp err = com.trifork.riak.RPB.RpbErrorResp.parseFrom(din);
-			throw new RiakError(err);
-		}
-
-		byte[] data = null;
-		if (len > 1) {
-			data = new byte[len - 1];
-			din.readFully(data);
-		}
-
-		if (code != get_code) {
-			throw new IOException("bad message code");
-		}
-
-		return data;
-	}
-
-	private void receive_code(int code) throws IOException, RiakError {
-		int len = din.readInt();
-		int get_code = din.read();
-		if (code == MSG_ErrorResp) {
-			RpbErrorResp err = com.trifork.riak.RPB.RpbErrorResp.parseFrom(din);
-			throw new RiakError(err);
-		}
-		if (len != 1 || code != get_code) {
-			throw new IOException("bad message code");
-		}
-	}
 }

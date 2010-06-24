@@ -22,6 +22,7 @@ import java.io.IOException;
 
 import com.trifork.riak.RPB.RpbErrorResp;
 
+@SuppressWarnings("serial")
 public class RiakError extends IOException {
 
 	public RiakError(RpbErrorResp err) {
