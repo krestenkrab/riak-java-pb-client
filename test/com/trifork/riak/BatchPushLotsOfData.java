@@ -12,13 +12,43 @@ public class BatchPushLotsOfData {
 
 	
 	
-	public static void main(String[] args) throws IOException {
+	public static void main(String[] args) throws IOException, InterruptedException {
 		
-		RiakClient riak = new RiakClient("127.0.0.1");
+		final RiakClient riak = new RiakClient("127.0.0.1");
 		
 		long before = System.currentTimeMillis();
 		
+		Thread t1 = new Thread() {
+			public void run() {
+				try {
+					insert_batch(riak, 1);
+				} catch (IOException e) {
+					e.printStackTrace();
+				}				
+			};
+		};
 		
+		Thread t2 = new Thread() {
+			public void run() {
+				try {
+					insert_batch(riak, 2);
+				} catch (IOException e) {
+					e.printStackTrace();
+				}				
+			};
+		};
+		
+		t1.start(); t2.start();
+		
+		t1.join(); t2.join();
+		
+		
+		long after = System.currentTimeMillis();
+		
+		System.out.println("TOTAL TIME: "+(1.0*(after-before)/1000.0)+"s");
+	}
+
+	private static void insert_batch(RiakClient riak, int prefix) throws IOException {
 		byte[] val = new byte[419];
 		ByteString value = ByteString.copyFrom(val);
 		
@@ -27,7 +57,7 @@ public class BatchPushLotsOfData {
 			
 			long before2 = System.currentTimeMillis();
 
-			String cpr = "" + (1000000000+i);
+			String cpr = "" + (prefix*1000000000+i);
 			ByteString cpr_key = ByteString.copyFromUtf8(cpr);
 			
 			RiakObject[] many = new RiakObject[1000];
@@ -44,14 +74,9 @@ public class BatchPushLotsOfData {
 			
 			long after2 = System.currentTimeMillis();
 			
-			System.out.println(""+i+" x 1000 INSERTS: "+(after2-before2)+"ms");
+			System.out.println(prefix+": "+i+" x 1000 INSERTS: "+(after2-before2)+"ms");
 
 		}
-		
-		
-		long after = System.currentTimeMillis();
-		
-		System.out.println("TOTAL TIME: "+(1.0*(after-before)/1000.0)+"s");
 	}
 	
 }
