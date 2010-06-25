@@ -15,10 +15,15 @@ Buffers API.
                                    ByteString.copyFrom(data));
     riak.store(ro);
 
-Some of the API uses `com.google.protobuf.ByteString` which represents a 
-chunk of (uninterpreted) bytes.  You'll find that class in 
-`lib/protobuf-java-2.3.0.jar` which also needs to be in your class path
-for the library to work.
+Some of the API uses `com.google.protobuf.ByteString` which represents
+a chunk of (uninterpreted) bytes.  Much of the API supports both
+`java.lang.String` and `ByteString`; sometimes you have to navigate
+from one kind of String to another using
+e.g. `ByteString.copyFromUtf8(String)` and
+`ByteString.toStringUtf8()`; but this lets you have keys that are
+arbitrary byte sequences in stead of just strings.  You'll find that
+class in `lib/protobuf-java-2.3.0.jar` which also needs to be in your
+class path for the library to work.
 
 Here is a complete program to list the entire contents of a riak
 store. 
@@ -39,7 +44,8 @@ store.
     }
 
 The methods `RiakClient.listKeys` and `RiakClient.mapReduce` return
-streaming handlers that should be closed when done.
+streaming handlers that should be closed explicitly (unless you run
+it to completion in which case it closes itself).
 
 If you set a clientID `RiakClient.setClientID`; that client ID is used 
 for all connections coming from the same client.  `RiakClient` is 
