@@ -1,19 +1,24 @@
 ## Java Client API for Riak based on the Protocol Buffers API
 
 This is an alternative to
-(riak-java-client)[http://hg.basho.com/riak-java-client/] which offers
-significantly better performance because you avoid encoding and decoding 
-content into the HTTP protocol.
+[riak-java-client](http://hg.basho.com/riak-java-client/) which offers
+significantly better performance because you avoid encoding and
+decoding content into the HTTP protocol.  On my dev machine I see ~
+10x performance improvement; so that's worth taking.
 
+The API is reasonably complete with what you can do in the Protocol
+Buffers API.  
 
-    RiakClient riak = new RiakClient("127.0.0.1");
+    RiakClient riak = new RiakClient("127.0.0.1", 8087);
     byte[] data = new byte[] { 1, 2, 3, 4 };
     RiakObject ro = new RiakObject("Bucket", "Key", 
                                    ByteString.copyFrom(data));
     riak.store(ro);
 
 Some of the API uses `com.google.protobuf.ByteString` which represents a 
-chunk of (uninterpreted) bytes.  
+chunk of (uninterpreted) bytes.  You'll find that class in 
+`lib/protobuf-java-2.3.0.jar` which also needs to be in your class path
+for the library to work.
 
 Here is a complete program to list the entire contents of a riak
 store. 
@@ -49,6 +54,10 @@ choose to run this in several threads (resulting in multiple connections).
 
 
 ## License / Copyright
+
+If you use this library, please be so kind to credit Trifork
+approproately in your system documentation.
+
 
     A Java Client API for Riak based on the Protocol Buffers API
 
