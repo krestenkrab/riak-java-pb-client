@@ -317,7 +317,7 @@ public class MapReduceBuilder {
     public MapReduceResponseSource submit(RequestMeta meta) throws IOException {
         if (riak == null)
             throw new IllegalStateException("Cannot perform map reduce without a RiakClient");
-        return riak.mapreduce(ByteString.copyFromUtf8( toJSON().toString() ), meta);
+        return riak.mapReduce(ByteString.copyFromUtf8( toJSON().toString() ), meta);
     }
 
     public MapReduceResponseSource submit() throws JSONException, IOException {

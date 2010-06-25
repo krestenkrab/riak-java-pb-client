@@ -405,7 +405,7 @@ public class RiakClient implements RiakMessageCodes {
 
 	// /////////////////////
 
-	void delete(String bucket, String key, int rw) throws IOException {
+	public void delete(String bucket, String key, int rw) throws IOException {
 		delete(ByteString.copyFromUtf8(bucket), ByteString.copyFromUtf8(key),
 				rw);
 	}
@@ -425,7 +425,7 @@ public class RiakClient implements RiakMessageCodes {
 
 	}
 
-	void delete(String bucket, String key) throws IOException {
+	public void delete(String bucket, String key) throws IOException {
 		delete(ByteString.copyFromUtf8(bucket), ByteString.copyFromUtf8(key));
 	}
 
@@ -506,8 +506,6 @@ public class RiakClient implements RiakMessageCodes {
 
 	public KeySource listKeys(ByteString bucket) throws IOException {
 
-		List<ByteString> keys = new ArrayList<ByteString>();
-
 		RiakConnection c = getConnection();
 		c.send(MSG_ListKeysReq, RPB.RpbListKeysReq.newBuilder().setBucket(
 				bucket).build());
@@ -517,14 +515,18 @@ public class RiakClient implements RiakMessageCodes {
 
 	// /////////////////////
 
-	MapReduceResponseSource mapreduce(JSONObject obj) throws IOException {
-		return mapreduce(ByteString.copyFromUtf8(obj.toString()),
+	public MapReduceResponseSource mapReduce(JSONObject obj) throws IOException {
+		return mapReduce(ByteString.copyFromUtf8(obj.toString()),
 				new RequestMeta().contentType("application/json"));
 	}
 
-	public MapReduceResponseSource mapreduce(ByteString request,
+	public MapReduceResponseSource mapReduce(String request,
 			RequestMeta meta) throws IOException {
-		List<MapReduceResponse> out = new ArrayList<MapReduceResponse>();
+		return mapReduce(ByteString.copyFromUtf8(request), meta);
+	}
+	
+	public MapReduceResponseSource mapReduce(ByteString request,
+			RequestMeta meta) throws IOException {
 		RiakConnection c = getConnection();
 
 		ByteString contentType = meta.getContentType();
