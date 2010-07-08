@@ -292,9 +292,9 @@ public class RiakClient implements RiakMessageCodes {
 					builder.setVclock(value.getVclock());
 				}
 
-				if (meta != null) {
+				builder.setReturnBody(false);
 
-					builder.setReturnBody(false);
+				if (meta != null) {
 
 					if (meta.writeQuorum != null) {
 						builder.setW(meta.writeQuorum.intValue());

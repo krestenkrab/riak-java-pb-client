@@ -45,22 +45,22 @@ public class RequestMeta {
 		}		
 	}
 
-	RequestMeta returnBody(boolean ret) {
+	public RequestMeta returnBody(boolean ret) {
 		returnBody = Boolean.valueOf(ret);
 		return this;
 	}
 
-	RequestMeta w(int w) {
+	public RequestMeta w(int w) {
 		w = new Integer(w);
 		return this;
 	}
 
-	RequestMeta dw(int dw) {
+	public RequestMeta dw(int dw) {
 		dw = new Integer(dw);
 		return this;
 	}
 	
-	RequestMeta contentType(String contentType) {
+	public RequestMeta contentType(String contentType) {
 		this.contentType = contentType;
 		return this;
 	}

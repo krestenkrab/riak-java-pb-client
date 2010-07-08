@@ -18,6 +18,7 @@
 
 package com.trifork.riak;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import com.google.protobuf.ByteString;
@@ -36,10 +37,22 @@ public class RiakLink {
 		this.tag = rpbLink.getTag();
 	}
 
-	public static RiakLink[] decode(List<RpbLink> list) {
-		RiakLink[] res = new RiakLink[list.size()];
-		for (int i = 0; i < res.length; i++) {
-			res[i] = new RiakLink(list.get(i));
+	public RiakLink(String bucket, String key, String tag) {
+		this.bucket = ByteString.copyFromUtf8(bucket);
+		this.key = ByteString.copyFromUtf8(key);
+		this.tag = ByteString.copyFromUtf8(tag);
+	}
+
+	public RiakLink(ByteString bucket, ByteString key, ByteString tag) {
+		this.bucket = (bucket);
+		this.key = (key);
+		this.tag = (tag);
+	}
+
+	public static List<RiakLink> decode(List<RpbLink> list) {
+		List<RiakLink>  res = new ArrayList<RiakLink>();
+		for (int i = 0; i < list.size(); i++) {
+			res.add ( new RiakLink(list.get(i)) );
 		}	
 		return res;
 	}

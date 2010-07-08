@@ -29,6 +29,16 @@ public class BucketProperties {
 	public Integer getNValue() {
 		return nValue;
 	}
+	
+	public BucketProperties allowMult(boolean val) {
+		this.allowMult = val;
+		return this;
+	}
+
+	public BucketProperties nValue(int val) {
+		this.nValue = val;
+		return this;
+	}
 
 	RpbBucketProps build() {
 		Builder builder = RpbBucketProps.newBuilder();

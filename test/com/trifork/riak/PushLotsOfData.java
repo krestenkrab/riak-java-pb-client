@@ -14,7 +14,7 @@ public class PushLotsOfData {
 	
 	public static void main(String[] args) throws IOException {
 		
-		RiakClient riak = new RiakClient("127.0.0.1");
+		RiakClient riak = new RiakClient("127.0.0.1", RiakConnection.DEFAULT_RIAK_PB_PORT);
 		
 		long before = System.currentTimeMillis();
 		

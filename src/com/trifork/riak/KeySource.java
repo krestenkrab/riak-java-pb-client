@@ -82,7 +82,7 @@ public class KeySource extends RiakStreamClient<ByteString> {
 			r = RPB.RpbListKeysResp.parseFrom(data);
 			i = 0;
 
-			// did we got an empty chunk? get another one.
+			// did we got an empty chunk! get another one.
 		} while (r.getKeysCount() == 0);
 	}
 

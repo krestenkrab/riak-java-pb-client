@@ -18,8 +18,10 @@
 
 package com.trifork.riak;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import com.google.protobuf.ByteString;
@@ -36,7 +38,7 @@ public class RiakObject {
 	private ByteString value;
 
 	private String contentType;
-	private RiakLink[] links;
+	private List<RiakLink> links;
 	private String vtag;
 	private String contentEncoding;
 	private String charset;
@@ -81,6 +83,12 @@ public class RiakObject {
 		this.value = content;
 	}
 
+	public RiakObject(String bucket, String key, byte[] content) {
+		this.bucket = ByteString.copyFromUtf8(bucket);
+		this.key = ByteString.copyFromUtf8(key);
+		this.value = ByteString.copyFrom(content);
+	}
+	
 	public RiakObject(String bucket, String key, String content) {
 		this.bucket = ByteString.copyFromUtf8(bucket);
 		this.key = ByteString.copyFromUtf8(key);
@@ -135,9 +143,9 @@ public class RiakObject {
 			b.setVtag(ByteString.copyFromUtf8(vtag));
 		}
 		
-		if (links != null && links.length != 0) {
-			for (int i = 0; i < links.length; i++) {
-				b.addLinks(links[i].build());
+		if (links != null && links.size() != 0) {
+			for (RiakLink l : links) {
+				b.addLinks( l.build() );
 			}
 		}
 		
@@ -161,6 +169,26 @@ public class RiakObject {
 		}
 		
 		return b.build();
+	}
+
+	public void setContentType(String contentType) {
+		this.contentType = contentType;
+	}
+
+	public void addLink(String tag, String bucket,
+			String key) {
+		if (links == null) {
+			links = new ArrayList<RiakLink>();
+		}
+		links.add(new RiakLink(bucket, key, tag));
+	}
+
+	public void addLink(ByteString tag, ByteString bucket,
+			ByteString key) {
+		if (links == null) {
+			links = new ArrayList<RiakLink>();
+		}
+		links.add(new RiakLink(bucket, key, tag));
 	}
 
 }

@@ -46,11 +46,21 @@ public class MapReduceResponse {
 		this.contentType = contentType2;
 	}
 
-	JSONArray getJSON() throws JSONException {
+	public JSONArray getJSON() throws JSONException {
 		if (response == null)
 			return null;
 		if (!APPLICATION_JSON.equals(contentType))
 			throw new IllegalArgumentException("not application/json");
 		return new JSONArray(response.toStringUtf8());
+	}
+
+	public ByteString getContent() {
+		if (response == null)
+			return null;
+		return response;
+	}
+
+	public String getContentType() {
+		return contentType.toStringUtf8();
 	}
 }
