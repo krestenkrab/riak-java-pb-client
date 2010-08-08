@@ -57,6 +57,18 @@ public class RiakLink {
 		return res;
 	}
 
+  public ByteString getBucket() {
+    return bucket;
+  }
+
+  public ByteString getKey() {
+    return key;
+  }
+
+  public ByteString getTag() {
+    return tag;
+  }
+
 	public RpbLink build() {
 		Builder b = RpbLink.newBuilder();
 		
