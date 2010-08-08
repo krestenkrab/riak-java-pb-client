@@ -25,7 +25,7 @@ arbitrary byte sequences in stead of just strings.  You'll find that
 class in `lib/protobuf-java-2.3.0.jar` which also needs to be in your
 class path for the library to work.
 
-Here is a complete program to list the entire contents of a riak
+Here is a complete program to list the entire contents of a Riak
 store. 
 
     RiakClient client = new RiakClient("127.0.0.1");
@@ -55,14 +55,14 @@ for all connections coming from the same client.  `RiakClient` is
 
 The method `RiakClient.store(RiakObject[], RequestMeta)` allows
 efficient bulk insertion (connection request/responses are handled
-asynchroneously underneath the covers).  To run even faster, you can 
+asynchronously underneath the covers).  To run even faster, you can 
 choose to run this in several threads (resulting in multiple connections).
 
 
 ## License / Copyright
 
 If you use this library, please be so kind to credit Trifork
-approproately in your system documentation.
+appropriately in your system documentation.
 
 
     A Java Client API for Riak based on the Protocol Buffers API
