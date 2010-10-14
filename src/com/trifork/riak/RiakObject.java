@@ -77,6 +77,13 @@ public class RiakObject {
 		}
 	}
 
+    public RiakObject(ByteString vclock, ByteString bucket, ByteString key, ByteString content) {
+		this.bucket = bucket;
+		this.key = key;
+		this.value = content;
+        this.vclock = vclock;
+	}
+
 	public RiakObject(ByteString bucket, ByteString key, ByteString content) {
 		this.bucket = bucket;
 		this.key = key;
@@ -121,6 +128,9 @@ public class RiakObject {
 		return vclock;
 	}
 
+    public ByteString getValue(){
+        return value;
+    }
 
 	RpbContent buildContent() {
 		Builder b = 
