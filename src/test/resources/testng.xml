@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE suite SYSTEM "http://testng.org/testng-1.0.dtd">
+
+<suite name="riak-java-pb-client-suite" verbose="4">
+    <test name="run-all">
+        <groups>
+            <run>
+                <include name="unit" />
+                <exclude name="db" />
+             </run>
+        </groups>
+        <packages>
+            <package name="com.trifork.riak.*"/>
+        </packages>
+    </test>
+</suite>
