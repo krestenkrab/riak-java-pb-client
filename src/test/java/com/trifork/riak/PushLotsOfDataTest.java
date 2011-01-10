@@ -9,7 +9,7 @@ import java.io.IOException;
 import com.google.protobuf.ByteString;
 import org.testng.annotations.Test;
 
-@Test(groups = "db", dependsOnMethods = "testIsRunning", sequential = true)
+@Test(groups = "unit", dependsOnGroups = { "db-available" })
 public class PushLotsOfDataTest {
 
     public void testPushingLotsOfData() throws IOException {

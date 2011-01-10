@@ -11,7 +11,7 @@ import static org.testng.FileAssert.fail;
  *
  * @author reiks, Jan 5, 2011
  */
-@Test(groups = "db", sequential = true)
+@Test(groups = "db-available")
 public class RiakRunningTest {
     
     public void testIsRunning() {
