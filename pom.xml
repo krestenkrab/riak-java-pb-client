@@ -11,7 +11,7 @@
     <url>https://github.com/krestenkrab/riak-java-pb-client</url>
 
     <properties>
-        <os.installed.protoc.version>2.2.0</os.installed.protoc.version>
+        <os.installed.protoc.version>2.3.0</os.installed.protoc.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <skip.tests>true</skip.tests>
     </properties>
