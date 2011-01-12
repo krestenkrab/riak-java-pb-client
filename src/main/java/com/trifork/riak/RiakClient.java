@@ -389,12 +389,12 @@ public class RiakClient implements RiakMessageCodes {
 
 			RpbPutResp resp = RPB.RpbPutResp.parseFrom(r);
 
-			RiakObject[] res = new RiakObject[resp.getContentsCount()];
+			RiakObject[] res = new RiakObject[resp.getContentCount()];
 			ByteString vclock = resp.getVclock();
 
 			for (int i = 0; i < res.length; i++) {
 				res[i] = new RiakObject(vclock, value.getBucketBS(), value
-						.getKeyBS(), resp.getContents(i));
+						.getKeyBS(), resp.getContent(i));
 			}
 
 			return res;
