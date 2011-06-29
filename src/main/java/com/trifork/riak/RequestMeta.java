@@ -46,17 +46,17 @@ public class RequestMeta {
 	}
 
 	public RequestMeta returnBody(boolean ret) {
-		returnBody = Boolean.valueOf(ret);
+		this.returnBody = Boolean.valueOf(ret);
 		return this;
 	}
 
 	public RequestMeta w(int w) {
-		w = new Integer(w);
+		this.writeQuorum = new Integer(w);
 		return this;
 	}
 
 	public RequestMeta dw(int dw) {
-		dw = new Integer(dw);
+		this.durableWriteQuorum = new Integer(dw);
 		return this;
 	}
 	
